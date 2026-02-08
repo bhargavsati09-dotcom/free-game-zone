@@ -29,13 +29,12 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-/* ---------- GAME STATE ---------- */
-let level = 1;
+/* ---------- STATE ---------- */
 let deaths = 0;
 let startTime = Date.now();
 let win = false;
 
-let player = { x: 80, y: 0, w: 24, h: 30, vy: 0, onGround: false };
+let player = { x: 120, y: 0, w: 24, h: 30, vy: 0, onGround: false };
 
 const gravity = 0.7;
 const jumpPower = -15;
@@ -45,38 +44,39 @@ document.addEventListener("keydown", e => keys[e.key] = true);
 document.addEventListener("keyup", e => keys[e.key] = false);
 
 function resetPlayer(){
-  player.x = 80;
-  player.y = canvas.height - 120;
+  player.x = 120;
+  player.y = canvas.height - 180; // SAFE PLATFORM
   player.vy = 0;
 }
 
-/* ---------- LEVEL 1 DESIGN (FIXED) ---------- */
-function getLevel(){
-  return {
-    platforms: [
-      {x:50,  y:canvas.height-140, w:120, h:12},
-      {x:220, y:canvas.height-220, w:120, h:12},
-      {x:390, y:canvas.height-300, w:120, h:12},
-      {x:560, y:canvas.height-380, w:120, h:12},
-      {x:740, y:canvas.height-460, w:120, h:12}
-    ],
-    portal: {x:900, y:canvas.height-520, w:40, h:60}
-  };
-}
+/* ---------- LEVEL DESIGN ---------- */
+let platforms = [
+  {x:80,  y:canvas.height-150, w:140, h:12}, // start
+  {x:260, y:canvas.height-230, w:120, h:12},
+  {x:420, y:canvas.height-300, w:120, h:12, fake:true}, // disappears
+  {x:600, y:canvas.height-360, w:120, h:12},
+  {x:780, y:canvas.height-430, w:120, h:12}
+];
 
-let current = getLevel();
+let portal = {x:950, y:canvas.height-500, w:40, h:60};
+
+/* ---------- TRAPS ---------- */
+let laser = { x:300, y:canvas.height-260, w:120, h:4, dir:1 };
+
+let stars = [
+  {x:500, y:canvas.height-320, r:8},
+  {x:720, y:canvas.height-390, r:8}
+];
+
+let randomPlatform = {x:520, y:canvas.height-260, w:100, h:12, active:false};
+
 resetPlayer();
-
-/* ---------- STARS ---------- */
-let stars = [];
-for(let i=0;i<150;i++){
-  stars.push({ x:Math.random()*2000, y:Math.random()*canvas.height, r:Math.random()*2 });
-}
 
 /* ---------- UPDATE ---------- */
 function update(){
   if(win) return;
 
+  /* movement */
   if(keys["ArrowLeft"]) player.x -= 5;
   if(keys["ArrowRight"]) player.x += 5;
 
@@ -89,38 +89,74 @@ function update(){
   player.y += player.vy;
   player.onGround = false;
 
-  /* Platform collision */
-  current.platforms.forEach(p=>{
+  /* platform collision */
+  platforms.forEach(p=>{
+    if(p.fake && player.x > p.x && player.x < p.x+p.w) return;
+
     if(
-      player.x < p.x + p.w &&
-      player.x + player.w > p.x &&
-      player.y < p.y + p.h &&
-      player.y + player.h > p.y &&
+      player.x < p.x+p.w &&
+      player.x+player.w > p.x &&
+      player.y < p.y+p.h &&
+      player.y+player.h > p.y &&
       player.vy >= 0
     ){
-      player.y = p.y - player.h;
+      player.y = p.y-player.h;
       player.vy = 0;
       player.onGround = true;
     }
   });
 
-  /* BLACK HOLE FLOOR (death if fall) */
-  if(player.y > canvas.height){
+  /* RANDOM PLATFORM appears after jump */
+  if(player.x > 400) randomPlatform.active = true;
+
+  if(randomPlatform.active){
+    let p = randomPlatform;
+    if(
+      player.x < p.x+p.w &&
+      player.x+player.w > p.x &&
+      player.y < p.y+p.h &&
+      player.y+player.h > p.y &&
+      player.vy >= 0
+    ){
+      player.y = p.y-player.h;
+      player.vy = 0;
+      player.onGround = true;
+    }
+  }
+
+  /* moving laser */
+  laser.x += laser.dir * 2;
+  if(laser.x < 260 || laser.x > 420) laser.dir *= -1;
+
+  if(
+    player.x < laser.x+laser.w &&
+    player.x+player.w > laser.x &&
+    player.y < laser.y+laser.h &&
+    player.y+player.h > laser.y
+  ){
     die();
   }
 
-  /* Portal */
-  let g = current.portal;
+  /* star collision */
+  stars.forEach(s=>{
+    let dx = player.x+12 - s.x;
+    let dy = player.y+15 - s.y;
+    if(Math.sqrt(dx*dx+dy*dy) < s.r+10) die();
+  });
+
+  /* fall death */
+  if(player.y > canvas.height) die();
+
+  /* portal */
   if(
-    player.x < g.x + g.w &&
-    player.x + player.w > g.x &&
-    player.y < g.y + g.h &&
-    player.y + player.h > g.y
+    player.x < portal.x+portal.w &&
+    player.x+player.w > portal.x &&
+    player.y < portal.y+portal.h &&
+    player.y+player.h > portal.y
   ){
     win = true;
   }
 
-  /* Timer */
   document.getElementById("time").textContent =
     ((Date.now()-startTime)/1000).toFixed(1);
 }
@@ -128,13 +164,6 @@ function update(){
 function die(){
   deaths++;
   document.getElementById("deaths").textContent = deaths;
-
-  if(deaths > 30){
-    deaths = 0;
-    level = 1;
-    startTime = Date.now();
-  }
-
   resetPlayer();
 }
 
@@ -142,22 +171,18 @@ function die(){
 function drawPlayer(){
   let x = player.x, y = player.y;
 
-  ctx.fillStyle="#ffd166"; ctx.fillRect(x+6,y,12,12);      // head
-  ctx.fillStyle="#06d6a0"; ctx.fillRect(x+4,y+12,16,12);   // body
-  ctx.fillStyle="#118ab2"; ctx.fillRect(x+4,y+24,6,6);     // leg
+  ctx.fillStyle="#ffd166"; ctx.fillRect(x+6,y,12,12);
+  ctx.fillStyle="#06d6a0"; ctx.fillRect(x+4,y+12,16,12);
+  ctx.fillStyle="#118ab2"; ctx.fillRect(x+4,y+24,6,6);
   ctx.fillRect(x+14,y+24,6,6);
-  ctx.fillStyle="#ef476f"; ctx.fillRect(x-4,y+12,6,10);    // backpack
+  ctx.fillStyle="#ef476f"; ctx.fillRect(x-4,y+12,6,10);
 }
 
 /* ---------- DRAW ---------- */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  /* stars */
-  ctx.fillStyle="white";
-  stars.forEach(s=>ctx.fillRect(s.x-player.x*0.2, s.y, s.r, s.r));
-
-  /* black hole floor glow */
+  /* black hole floor */
   let grad = ctx.createLinearGradient(0,canvas.height-80,0,canvas.height);
   grad.addColorStop(0,"#220044");
   grad.addColorStop(1,"black");
@@ -166,23 +191,41 @@ function draw(){
 
   /* platforms */
   ctx.fillStyle="#00d4ff";
-  current.platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
+  platforms.forEach(p=>{
+    if(p.fake && player.x > p.x && player.x < p.x+p.w) return;
+    ctx.fillRect(p.x,p.y,p.w,p.h);
+  });
+
+  if(randomPlatform.active){
+    let p=randomPlatform;
+    ctx.fillRect(p.x,p.y,p.w,p.h);
+  }
+
+  /* laser */
+  ctx.fillStyle="red";
+  ctx.fillRect(laser.x,laser.y,laser.w,laser.h);
+
+  /* stars */
+  ctx.fillStyle="yellow";
+  stars.forEach(s=>{
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fill();
+  });
 
   /* portal */
   ctx.fillStyle="purple";
-  let g=current.portal;
-  ctx.fillRect(g.x,g.y,g.w,g.h);
+  ctx.fillRect(portal.x,portal.y,portal.w,portal.h);
 
   drawPlayer();
 
   if(win){
     ctx.fillStyle="white";
     ctx.font="40px Arial";
-    ctx.fillText("LEVEL COMPLETE ⏳", canvas.width/2-180, canvas.height/2);
+    ctx.fillText("LEVEL COMPLETE 😈", canvas.width/2-170, canvas.height/2);
   }
 }
 
-/* ---------- LOOP ---------- */
 function loop(){
   update();
   draw();
@@ -190,6 +233,8 @@ function loop(){
 }
 loop();
 </script>
+
+
 
 </body>
 </html>
