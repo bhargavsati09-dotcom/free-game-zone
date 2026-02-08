@@ -44,7 +44,8 @@ const jumpPower = -15;
 
 function resetPlayer(){
   player.x = 120;
-  player.y = canvas.height - 220;
+  player.y = canvas.height - 260; // spawn ON first platform
+
   player.vx = 0;
   player.vy = 0;
 }
@@ -157,7 +158,16 @@ function update(){
 }
 
 /* ---------- DRAW FACE (EXTREME) ---------- */
-function drawFace(){
+function drawFace(ctx.fillStyle="white";
+ctx.font="18px Arial";
+
+if(!firstDeath){
+  ctx.fillText("Just a simple space person game", x-150, y+80);
+}
+else if(firstDeath && deaths === 1){
+  ctx.fillText("Nah, it is not that much simple but you can do it", x-210, y+80);
+}
+){
 
   let x = canvas.width - 200;
   let y = 140;
@@ -242,8 +252,19 @@ function draw(){
   ctx.fill();
 
   /* player */
-  ctx.fillStyle="lime";
-  ctx.fillRect(player.x,player.y,player.w,player.h);
+ // body
+ctx.fillStyle="#06d6a0";
+ctx.fillRect(player.x, player.y+10, player.w, player.h-10);
+
+// head
+ctx.fillStyle="#ffd166";
+ctx.fillRect(player.x+6, player.y, player.w-12, 10);
+
+// legs
+ctx.fillStyle="#118ab2";
+ctx.fillRect(player.x+2, player.y+player.h-6, 8, 6);
+ctx.fillRect(player.x+player.w-10, player.y+player.h-6, 8, 6);
+
 
   drawFace();
 
