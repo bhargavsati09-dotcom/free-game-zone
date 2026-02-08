@@ -22,6 +22,7 @@ Time: <span id="time">0.0</span>s
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+/* ---------- FULLSCREEN ---------- */
 function resize(){
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -32,218 +33,229 @@ resize();
 /* ---------- GAME STATE ---------- */
 let deaths = 0;
 let firstDeath = false;
-let showText = true;
 let laughTimer = 0;
 let win = false;
-
 let startTime = Date.now();
 
-let player = { x: 120, y: 0, w: 26, h: 32, vx:0, vy: 0 };
+/* ---------- PLAYER ---------- */
+let player = { x:120, y:0, w:28, h:34, vx:0, vy:0 };
 const gravity = 0.7;
 const jumpPower = -15;
 
-let keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
-
 function resetPlayer(){
   player.x = 120;
-  player.y = canvas.height - 200;
+  player.y = canvas.height - 220;
   player.vx = 0;
   player.vy = 0;
 }
-
-/* ---------- SOLID PLATFORMS ---------- */
-let platforms = [
-  {x:80,  y:canvas.height-170, w:160, h:16},
-  {x:300, y:canvas.height-260, w:140, h:16},
-  {x:520, y:canvas.height-350, w:140, h:16},
-  {x:740, y:canvas.height-440, w:140, h:16}
-];
-
-let portal = {x:960, y:canvas.height-520, w:60, h:80};
-
 resetPlayer();
 
+/* ---------- INPUT ---------- */
+let keys = {};
+addEventListener("keydown", e=>keys[e.key]=true);
+addEventListener("keyup", e=>keys[e.key]=false);
+
+/* ---------- PLATFORMS ---------- */
+let platforms = [
+  {x:80,  y:canvas.height-180, w:160, h:16},
+  {x:320, y:canvas.height-260, w:140, h:16},
+  {x:560, y:canvas.height-340, w:140, h:16},
+  {x:820, y:canvas.height-420, w:140, h:16}
+];
+
+/* disappearing fake platform */
+let fakePlatform = {x:450, y:canvas.height-120, w:120, h:16, active:true};
+
+/* sudden appearing platform */
+let trollPlatform = {x:700, y:canvas.height-300, w:120, h:16, visible:false};
+
+/* moving laser */
+let laser = {x:0, y:canvas.height-200, w:200, h:6, dir:1};
+
+/* portal */
+let portal = {x:1040, y:canvas.height-500, w:60, h:90};
+
 /* ---------- COLLISION ---------- */
-function rects(a,b){
+function hit(a,b){
   return a.x < b.x+b.w &&
          a.x+a.w > b.x &&
          a.y < b.y+b.h &&
          a.y+a.h > b.y;
 }
 
+function onGround(){
+  let test = {...player, y:player.y+1};
+  return [...platforms, fakePlatform, trollPlatform]
+    .filter(p=>p && (p.visible!==false) && (p.active!==false))
+    .some(p=>hit(test,p));
+}
+
+/* ---------- DEATH ---------- */
+function die(){
+  deaths++;
+  laughTimer = 50;
+  if(!firstDeath) firstDeath = true;
+  resetPlayer();
+}
+
 /* ---------- UPDATE ---------- */
 function update(){
+
   if(win) return;
 
   /* movement */
   player.vx = 0;
   if(keys["ArrowLeft"]) player.vx = -5;
   if(keys["ArrowRight"]) player.vx = 5;
-
-  if(keys["ArrowUp"] && onGround()){
-    player.vy = jumpPower;
-  }
+  if(keys["ArrowUp"] && onGround()) player.vy = jumpPower;
 
   player.vy += gravity;
 
-  /* horizontal move */
+  /* horizontal */
   player.x += player.vx;
-  platforms.forEach(p=>{
-    if(rects(player,p)){
-      if(player.vx > 0) player.x = p.x - player.w;
-      if(player.vx < 0) player.x = p.x + p.w;
+  [...platforms, fakePlatform, trollPlatform].forEach(p=>{
+    if(!p || p.visible===false || p.active===false) return;
+    if(hit(player,p)){
+      if(player.vx>0) player.x = p.x-player.w;
+      if(player.vx<0) player.x = p.x+p.w;
     }
   });
 
-  /* vertical move */
+  /* vertical */
   player.y += player.vy;
-  platforms.forEach(p=>{
-    if(rects(player,p)){
-      if(player.vy > 0){ // falling
-        player.y = p.y - player.h;
-        player.vy = 0;
-      }
-      if(player.vy < 0){ // hitting bottom
-        player.y = p.y + p.h;
-        player.vy = 0;
-      }
+  [...platforms, fakePlatform, trollPlatform].forEach(p=>{
+    if(!p || p.visible===false || p.active===false) return;
+    if(hit(player,p)){
+      if(player.vy>0){ player.y = p.y-player.h; player.vy=0; }
+      if(player.vy<0){ player.y = p.y+p.h; player.vy=0; }
     }
   });
 
-  /* fall death */
-  if(player.y > canvas.height){
-    die();
+  /* fake platform disappears after step */
+  if(fakePlatform.active && hit(player,fakePlatform)){
+    setTimeout(()=> fakePlatform.active=false, 400);
   }
+
+  /* troll platform appears near jump */
+  if(!trollPlatform.visible && player.x > 600){
+    trollPlatform.visible = true;
+  }
+
+  /* moving laser */
+  laser.x += 3 * laser.dir;
+  if(laser.x < 200 || laser.x > 700) laser.dir *= -1;
+
+  if(hit(player,laser)) die();
+
+  /* fall */
+  if(player.y > canvas.height) die();
 
   /* portal */
-  if(rects(player,portal)){
-    win = true;
-  }
+  if(hit(player,portal)) win = true;
 
-  /* timer */
-  document.getElementById("time").textContent =
-    ((Date.now()-startTime)/1000).toFixed(1);
-
-  if(laughTimer > 0) laughTimer--;
+  if(laughTimer>0) laughTimer--;
 }
 
-function onGround(){
-  let test = {...player, y: player.y+1};
-  return platforms.some(p => rects(test,p));
-}
-
-/* ---------- DEATH ---------- */
-function die(){
-  deaths++;
-  document.getElementById("deaths").textContent = deaths;
-
-  if(!firstDeath){
-    firstDeath = true;
-    showText = true;
-  }else{
-    showText = false;
-    laughTimer = 60;
-  }
-
-  resetPlayer();
-}
-
-/* ---------- DRAW PORTAL ---------- */
-function drawPortal(){
-  let g = ctx.createRadialGradient(
-    portal.x+portal.w/2, portal.y+portal.h/2, 10,
-    portal.x+portal.w/2, portal.y+portal.h/2, 40
-  );
-  g.addColorStop(0,"#fff");
-  g.addColorStop(0.5,"#9b5cff");
-  g.addColorStop(1,"#000");
-
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.ellipse(
-    portal.x+portal.w/2,
-    portal.y+portal.h/2,
-    30, 45,
-    0, 0, Math.PI*2
-  );
-  ctx.fill();
-}
-
-/* ---------- DRAW FACE ---------- */
+/* ---------- DRAW FACE (EXTREME) ---------- */
 function drawFace(){
-  let x = canvas.width - 150;
-  let y = 120;
 
+  let x = canvas.width - 200;
+  let y = 140;
   let laughing = laughTimer > 0;
 
-  /* eyes */
-  ctx.fillStyle = "white";
-  if(laughing){
-    ctx.fillRect(x-20,y,20,4);
-    ctx.fillRect(x+10,y,20,4);
-  }else{
-    ctx.fillRect(x-20,y-5,12,12);
-    ctx.fillRect(x+10,y-5,12,12);
-  }
-
-  /* eyebrows */
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 2;
+  /* red glow */
+  let g = ctx.createRadialGradient(x,y,20,x,y,120);
+  g.addColorStop(0,"rgba(255,0,0,0.7)");
+  g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(x-22,y-10-(laughing?5:0));
-  ctx.lineTo(x-5,y-15-(laughing?5:0));
-  ctx.moveTo(x+10,y-15-(laughing?5:0));
-  ctx.lineTo(x+27,y-10-(laughing?5:0));
-  ctx.stroke();
+  ctx.arc(x,y,120,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 3;
+
+  /* eyes */
+  if(laughing){
+    ctx.beginPath();
+    ctx.moveTo(x-40,y-10); ctx.lineTo(x-10,y-5);
+    ctx.moveTo(x+10,y-5); ctx.lineTo(x+40,y-10);
+    ctx.stroke();
+  }else{
+    ctx.strokeRect(x-40,y-25,20,15);
+    ctx.strokeRect(x+20,y-25,20,15);
+  }
 
   /* mouth */
   ctx.beginPath();
   if(laughing){
-    ctx.arc(x, y+15, 12, 0, Math.PI);
+    ctx.arc(x,y+15,25,0,Math.PI);
   }else{
-    ctx.arc(x, y+18, 10, Math.PI, 0);
+    ctx.arc(x,y+25,20,Math.PI,0);
   }
   ctx.stroke();
 
-  /* TEXT */
-  ctx.font = "16px Arial";
-  ctx.fillStyle = "white";
+  ctx.fillStyle="white";
+  ctx.font="18px Arial";
 
   if(!firstDeath){
-    ctx.fillText("Just a simple space person game", x-120, y+50);
-  }else if(showText){
-    ctx.fillText("Nah, it is not that much simple but you can do it", x-170, y+50);
+    ctx.fillText("Just a simple space person game", x-140, y+70);
+  }else if(firstDeath && deaths===1){
+    ctx.fillText("Nah… not that simple 😈", x-90, y+70);
   }
-}
-
-/* ---------- DRAW PLAYER ---------- */
-function drawPlayer(){
-  let x=player.x, y=player.y;
-
-  ctx.fillStyle="#ffd166"; ctx.fillRect(x+6,y,12,12);
-  ctx.fillStyle="#06d6a0"; ctx.fillRect(x+4,y+12,18,12);
-  ctx.fillStyle="#118ab2"; ctx.fillRect(x+4,y+24,6,8);
-  ctx.fillRect(x+16,y+24,6,8);
 }
 
 /* ---------- DRAW ---------- */
 function draw(){
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   /* platforms */
   ctx.fillStyle="#00d4ff";
   platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
 
-  drawPortal();
-  drawPlayer();
+  if(fakePlatform.active){
+    ctx.fillStyle="orange";
+    ctx.fillRect(fakePlatform.x,fakePlatform.y,fakePlatform.w,fakePlatform.h);
+  }
+
+  if(trollPlatform.visible){
+    ctx.fillStyle="purple";
+    ctx.fillRect(trollPlatform.x,trollPlatform.y,trollPlatform.w,trollPlatform.h);
+  }
+
+  /* laser */
+  ctx.fillStyle="red";
+  ctx.fillRect(laser.x, laser.y, laser.w, laser.h);
+
+  /* portal */
+  let grad = ctx.createRadialGradient(
+    portal.x+30, portal.y+45, 5,
+    portal.x+30, portal.y+45, 40
+  );
+  grad.addColorStop(0,"white");
+  grad.addColorStop(0.5,"violet");
+  grad.addColorStop(1,"black");
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  ctx.ellipse(portal.x+30,portal.y+45,30,45,0,0,Math.PI*2);
+  ctx.fill();
+
+  /* player */
+  ctx.fillStyle="lime";
+  ctx.fillRect(player.x,player.y,player.w,player.h);
+
   drawFace();
 
+  /* UI */
+  ctx.fillStyle="white";
+  ctx.font="18px Arial";
+  ctx.fillText("Deaths: "+deaths, 20,30);
+  ctx.fillText("Time: "+((Date.now()-startTime)/1000).toFixed(1), 20,55);
+
   if(win){
-    ctx.fillStyle="white";
-    ctx.font="40px Arial";
-    ctx.fillText("YOU ESCAPED TIME 😈", canvas.width/2-180, canvas.height/2);
+    ctx.font="48px Arial";
+    ctx.fillText("YOU ESCAPED 😈", canvas.width/2-160, canvas.height/2);
   }
 }
 
@@ -255,6 +267,7 @@ function loop(){
 }
 loop();
 </script>
+
 
 
 
