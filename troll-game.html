@@ -29,13 +29,16 @@ function resize(){
 window.addEventListener("resize", resize);
 resize();
 
-/* ---------- STATE ---------- */
+/* ---------- GAME STATE ---------- */
 let deaths = 0;
-let startTime = Date.now();
+let firstDeath = false;
+let showText = true;
+let laughTimer = 0;
 let win = false;
 
-let player = { x: 120, y: 0, w: 24, h: 30, vy: 0, onGround: false };
+let startTime = Date.now();
 
+let player = { x: 120, y: 0, w: 26, h: 32, vx:0, vy: 0 };
 const gravity = 0.7;
 const jumpPower = -15;
 
@@ -45,180 +48,206 @@ document.addEventListener("keyup", e => keys[e.key] = false);
 
 function resetPlayer(){
   player.x = 120;
-  player.y = canvas.height - 180;
+  player.y = canvas.height - 200;
+  player.vx = 0;
   player.vy = 0;
 }
 
-/* ---------- LEVEL ---------- */
+/* ---------- SOLID PLATFORMS ---------- */
 let platforms = [
-  {x:80,  y:canvas.height-150, w:140, h:12},
-  {x:260, y:canvas.height-230, w:120, h:12},
-  {x:420, y:canvas.height-300, w:120, h:12, fake:true},
-  {x:600, y:canvas.height-360, w:120, h:12},
-  {x:780, y:canvas.height-430, w:120, h:12}
+  {x:80,  y:canvas.height-170, w:160, h:16},
+  {x:300, y:canvas.height-260, w:140, h:16},
+  {x:520, y:canvas.height-350, w:140, h:16},
+  {x:740, y:canvas.height-440, w:140, h:16}
 ];
 
-let portal = {x:950, y:canvas.height-500, w:40, h:60};
-
-/* ---------- TRAPS ---------- */
-let laser = { x:300, y:canvas.height-260, w:120, h:4, dir:1 };
-
-let stars = [
-  {x:500, y:canvas.height-320, r:10},
-  {x:720, y:canvas.height-390, r:10}
-];
-
-let randomPlatform = {x:520, y:canvas.height-260, w:100, h:12, active:false};
+let portal = {x:960, y:canvas.height-520, w:60, h:80};
 
 resetPlayer();
+
+/* ---------- COLLISION ---------- */
+function rects(a,b){
+  return a.x < b.x+b.w &&
+         a.x+a.w > b.x &&
+         a.y < b.y+b.h &&
+         a.y+a.h > b.y;
+}
 
 /* ---------- UPDATE ---------- */
 function update(){
   if(win) return;
 
-  if(keys["ArrowLeft"]) player.x -= 5;
-  if(keys["ArrowRight"]) player.x += 5;
+  /* movement */
+  player.vx = 0;
+  if(keys["ArrowLeft"]) player.vx = -5;
+  if(keys["ArrowRight"]) player.vx = 5;
 
-  if(keys["ArrowUp"] && player.onGround){
+  if(keys["ArrowUp"] && onGround()){
     player.vy = jumpPower;
-    player.onGround = false;
   }
 
   player.vy += gravity;
-  player.y += player.vy;
-  player.onGround = false;
 
-  /* ONE-WAY platform collision */
-  [...platforms, ...(randomPlatform.active ? [randomPlatform] : [])].forEach(p=>{
-    if(p.fake && player.x > p.x && player.x < p.x+p.w) return;
-
-    if(
-      player.x < p.x+p.w &&
-      player.x+player.w > p.x &&
-      player.y+player.h <= p.y + player.vy &&
-      player.y+player.h >= p.y &&
-      player.vy >= 0
-    ){
-      player.y = p.y-player.h;
-      player.vy = 0;
-      player.onGround = true;
+  /* horizontal move */
+  player.x += player.vx;
+  platforms.forEach(p=>{
+    if(rects(player,p)){
+      if(player.vx > 0) player.x = p.x - player.w;
+      if(player.vx < 0) player.x = p.x + p.w;
     }
   });
 
-  /* Random platform trigger */
-  if(player.x > 400) randomPlatform.active = true;
-
-  /* Moving laser */
-  laser.x += laser.dir * 2;
-  if(laser.x < 260 || laser.x > 420) laser.dir *= -1;
-
-  if(rectHit(player, laser)) die();
-
-  /* Star collision */
-  stars.forEach(s=>{
-    let dx = player.x+12 - s.x;
-    let dy = player.y+15 - s.y;
-    if(Math.sqrt(dx*dx+dy*dy) < s.r+10) die();
+  /* vertical move */
+  player.y += player.vy;
+  platforms.forEach(p=>{
+    if(rects(player,p)){
+      if(player.vy > 0){ // falling
+        player.y = p.y - player.h;
+        player.vy = 0;
+      }
+      if(player.vy < 0){ // hitting bottom
+        player.y = p.y + p.h;
+        player.vy = 0;
+      }
+    }
   });
 
-  /* Fall death */
-  if(player.y > canvas.height) die();
+  /* fall death */
+  if(player.y > canvas.height){
+    die();
+  }
 
-  /* Portal */
-  if(rectHit(player, portal)) win = true;
+  /* portal */
+  if(rects(player,portal)){
+    win = true;
+  }
 
+  /* timer */
   document.getElementById("time").textContent =
     ((Date.now()-startTime)/1000).toFixed(1);
+
+  if(laughTimer > 0) laughTimer--;
 }
 
+function onGround(){
+  let test = {...player, y: player.y+1};
+  return platforms.some(p => rects(test,p));
+}
+
+/* ---------- DEATH ---------- */
 function die(){
   deaths++;
   document.getElementById("deaths").textContent = deaths;
 
-  randomPlatform.active = false; // FIXED BUG
+  if(!firstDeath){
+    firstDeath = true;
+    showText = true;
+  }else{
+    showText = false;
+    laughTimer = 60;
+  }
 
   resetPlayer();
 }
 
-function rectHit(a,b){
-  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+/* ---------- DRAW PORTAL ---------- */
+function drawPortal(){
+  let g = ctx.createRadialGradient(
+    portal.x+portal.w/2, portal.y+portal.h/2, 10,
+    portal.x+portal.w/2, portal.y+portal.h/2, 40
+  );
+  g.addColorStop(0,"#fff");
+  g.addColorStop(0.5,"#9b5cff");
+  g.addColorStop(1,"#000");
+
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(
+    portal.x+portal.w/2,
+    portal.y+portal.h/2,
+    30, 45,
+    0, 0, Math.PI*2
+  );
+  ctx.fill();
 }
 
-/* ---------- DRAW STAR SHAPE ---------- */
-function drawStar(x,y,r){
-  ctx.beginPath();
-  for(let i=0;i<5;i++){
-    ctx.lineTo(
-      x + r*Math.cos((18+i*72)*Math.PI/180),
-      y - r*Math.sin((18+i*72)*Math.PI/180)
-    );
-    ctx.lineTo(
-      x + (r/2)*Math.cos((54+i*72)*Math.PI/180),
-      y - (r/2)*Math.sin((54+i*72)*Math.PI/180)
-    );
+/* ---------- DRAW FACE ---------- */
+function drawFace(){
+  let x = canvas.width - 150;
+  let y = 120;
+
+  let laughing = laughTimer > 0;
+
+  /* eyes */
+  ctx.fillStyle = "white";
+  if(laughing){
+    ctx.fillRect(x-20,y,20,4);
+    ctx.fillRect(x+10,y,20,4);
+  }else{
+    ctx.fillRect(x-20,y-5,12,12);
+    ctx.fillRect(x+10,y-5,12,12);
   }
-  ctx.closePath();
-  ctx.fillStyle="orange";
-  ctx.shadowColor="red";
-  ctx.shadowBlur=15;
-  ctx.fill();
-  ctx.shadowBlur=0;
+
+  /* eyebrows */
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x-22,y-10-(laughing?5:0));
+  ctx.lineTo(x-5,y-15-(laughing?5:0));
+  ctx.moveTo(x+10,y-15-(laughing?5:0));
+  ctx.lineTo(x+27,y-10-(laughing?5:0));
+  ctx.stroke();
+
+  /* mouth */
+  ctx.beginPath();
+  if(laughing){
+    ctx.arc(x, y+15, 12, 0, Math.PI);
+  }else{
+    ctx.arc(x, y+18, 10, Math.PI, 0);
+  }
+  ctx.stroke();
+
+  /* TEXT */
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "white";
+
+  if(!firstDeath){
+    ctx.fillText("Just a simple space person game", x-120, y+50);
+  }else if(showText){
+    ctx.fillText("Nah, it is not that much simple but you can do it", x-170, y+50);
+  }
 }
 
 /* ---------- DRAW PLAYER ---------- */
 function drawPlayer(){
   let x=player.x, y=player.y;
+
   ctx.fillStyle="#ffd166"; ctx.fillRect(x+6,y,12,12);
-  ctx.fillStyle="#06d6a0"; ctx.fillRect(x+4,y+12,16,12);
-  ctx.fillStyle="#118ab2"; ctx.fillRect(x+4,y+24,6,6);
-  ctx.fillRect(x+14,y+24,6,6);
-  ctx.fillStyle="#ef476f"; ctx.fillRect(x-4,y+12,6,10);
+  ctx.fillStyle="#06d6a0"; ctx.fillRect(x+4,y+12,18,12);
+  ctx.fillStyle="#118ab2"; ctx.fillRect(x+4,y+24,6,8);
+  ctx.fillRect(x+16,y+24,6,8);
 }
 
 /* ---------- DRAW ---------- */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  /* black hole floor */
-  let grad = ctx.createLinearGradient(0,canvas.height-80,0,canvas.height);
-  grad.addColorStop(0,"#220044");
-  grad.addColorStop(1,"black");
-  ctx.fillStyle=grad;
-  ctx.fillRect(0,canvas.height-80,canvas.width,80);
-
   /* platforms */
   ctx.fillStyle="#00d4ff";
-  platforms.forEach(p=>{
-    if(p.fake && player.x>p.x && player.x<p.x+p.w) return;
-    ctx.fillRect(p.x,p.y,p.w,p.h);
-  });
+  platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
 
-  /* random hidden platform */
-  if(randomPlatform.active){
-    ctx.fillStyle="rgba(180,0,255,0.3)";
-    ctx.fillRect(randomPlatform.x,randomPlatform.y,randomPlatform.w,randomPlatform.h);
-  }
-
-  /* laser */
-  ctx.fillStyle="red";
-  ctx.fillRect(laser.x,laser.y,laser.w,laser.h);
-
-  /* deadly stars */
-  stars.forEach(s=>drawStar(s.x,s.y,s.r));
-
-  /* portal */
-  ctx.fillStyle="purple";
-  ctx.fillRect(portal.x,portal.y,portal.w,portal.h);
-
+  drawPortal();
   drawPlayer();
+  drawFace();
 
   if(win){
     ctx.fillStyle="white";
     ctx.font="40px Arial";
-    ctx.fillText("LEVEL COMPLETE 😈", canvas.width/2-170, canvas.height/2);
+    ctx.fillText("YOU ESCAPED TIME 😈", canvas.width/2-180, canvas.height/2);
   }
 }
 
+/* ---------- LOOP ---------- */
 function loop(){
   update();
   draw();
@@ -226,7 +255,6 @@ function loop(){
 }
 loop();
 </script>
-
 
 
 
