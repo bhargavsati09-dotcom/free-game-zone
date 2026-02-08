@@ -20,8 +20,8 @@
 </head>
 <body>
 
-<h2>Troll Platform Game</h2>
-<p>Use Arrow Keys to move and jump</p>
+<h2>Troll Platform Game 😈</h2>
+<p>Arrow keys to move • Reach the yellow block</p>
 
 <canvas id="game" width="600" height="350"></canvas>
 
@@ -32,26 +32,42 @@ const ctx = canvas.getContext("2d");
 let player = { x: 50, y: 250, w: 20, h: 20, vy: 0, onGround: false };
 
 let gravity = 0.6;
-let jumpPower = -10;
+let jumpPower = -13; // stronger jump
 
+let win = false;
+
+// platforms
 let platforms = [
-  {x:0, y:300, w:600, h:50},      // ground
-  {x:150, y:230, w:80, h:10},
-  {x:300, y:190, w:80, h:10},
-  {x:470, y:150, w:80, h:10}      // yellow goal
+  {x:0, y:300, w:600, h:50},       // ground
+  {x:120, y:240, w:80, h:10},
+  {x:250, y:200, w:80, h:10, fake:true}, // FAKE disappears
+  {x:380, y:170, w:80, h:10},
 ];
 
+// spikes
 let spikes = [
+  {x:200, y:290, w:20, h:10},
   {x:220, y:290, w:20, h:10},
-  {x:240, y:290, w:20, h:10}
+  {x:420, y:160, w:20, h:10, hidden:true} // hidden trap
 ];
+
+// goal
+let goal = {x:520, y:140, w:25, h:25};
 
 let keys = {};
 
 document.addEventListener("keydown", e => keys[e.key] = true);
 document.addEventListener("keyup", e => keys[e.key] = false);
 
+function reset() {
+  player.x = 50;
+  player.y = 250;
+  player.vy = 0;
+}
+
 function update() {
+  if (win) return;
+
   // movement
   if (keys["ArrowLeft"]) player.x -= 3;
   if (keys["ArrowRight"]) player.x += 3;
@@ -66,9 +82,13 @@ function update() {
   player.vy += gravity;
   player.y += player.vy;
 
-  // collision with platforms
+  // platform collision
   player.onGround = false;
   platforms.forEach(p => {
+
+    // FAKE platform disappears
+    if (p.fake && player.x > p.x && player.x < p.x + p.w) return;
+
     if (
       player.x < p.x + p.w &&
       player.x + player.w > p.x &&
@@ -81,18 +101,31 @@ function update() {
     }
   });
 
-  // spike collision → restart
+  // spike collision
   spikes.forEach(s => {
+
+    // hidden spike appears when near
+    if (s.hidden && player.x < 380) return;
+
     if (
       player.x < s.x + s.w &&
       player.x + player.w > s.x &&
       player.y < s.y + s.h &&
       player.y + player.h > s.y
     ) {
-      player.x = 50;
-      player.y = 250;
+      reset();
     }
   });
+
+  // win check
+  if (
+    player.x < goal.x + goal.w &&
+    player.x + player.w > goal.x &&
+    player.y < goal.y + goal.h &&
+    player.y + player.h > goal.y
+  ) {
+    win = true;
+  }
 }
 
 function draw() {
@@ -104,15 +137,28 @@ function draw() {
 
   // platforms
   ctx.fillStyle = "cyan";
-  platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+  platforms.forEach(p => {
+    if (p.fake && player.x > p.x && player.x < p.x + p.w) return;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+  });
 
   // spikes
   ctx.fillStyle = "red";
-  spikes.forEach(s => ctx.fillRect(s.x, s.y, s.w, s.h));
+  spikes.forEach(s => {
+    if (s.hidden && player.x < 380) return;
+    ctx.fillRect(s.x, s.y, s.w, s.h);
+  });
 
   // goal
   ctx.fillStyle = "yellow";
-  ctx.fillRect(500,130,20,20);
+  ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
+
+  // win text
+  if (win) {
+    ctx.fillStyle = "white";
+    ctx.font = "30px Arial";
+    ctx.fillText("YOU WIN 😎", 220, 160);
+  }
 }
 
 function gameLoop() {
