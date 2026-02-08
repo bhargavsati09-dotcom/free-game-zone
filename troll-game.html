@@ -45,15 +45,15 @@ document.addEventListener("keyup", e => keys[e.key] = false);
 
 function resetPlayer(){
   player.x = 120;
-  player.y = canvas.height - 180; // SAFE PLATFORM
+  player.y = canvas.height - 180;
   player.vy = 0;
 }
 
-/* ---------- LEVEL DESIGN ---------- */
+/* ---------- LEVEL ---------- */
 let platforms = [
-  {x:80,  y:canvas.height-150, w:140, h:12}, // start
+  {x:80,  y:canvas.height-150, w:140, h:12},
   {x:260, y:canvas.height-230, w:120, h:12},
-  {x:420, y:canvas.height-300, w:120, h:12, fake:true}, // disappears
+  {x:420, y:canvas.height-300, w:120, h:12, fake:true},
   {x:600, y:canvas.height-360, w:120, h:12},
   {x:780, y:canvas.height-430, w:120, h:12}
 ];
@@ -64,8 +64,8 @@ let portal = {x:950, y:canvas.height-500, w:40, h:60};
 let laser = { x:300, y:canvas.height-260, w:120, h:4, dir:1 };
 
 let stars = [
-  {x:500, y:canvas.height-320, r:8},
-  {x:720, y:canvas.height-390, r:8}
+  {x:500, y:canvas.height-320, r:10},
+  {x:720, y:canvas.height-390, r:10}
 ];
 
 let randomPlatform = {x:520, y:canvas.height-260, w:100, h:12, active:false};
@@ -76,7 +76,6 @@ resetPlayer();
 function update(){
   if(win) return;
 
-  /* movement */
   if(keys["ArrowLeft"]) player.x -= 5;
   if(keys["ArrowRight"]) player.x += 5;
 
@@ -89,15 +88,15 @@ function update(){
   player.y += player.vy;
   player.onGround = false;
 
-  /* platform collision */
-  platforms.forEach(p=>{
+  /* ONE-WAY platform collision */
+  [...platforms, ...(randomPlatform.active ? [randomPlatform] : [])].forEach(p=>{
     if(p.fake && player.x > p.x && player.x < p.x+p.w) return;
 
     if(
       player.x < p.x+p.w &&
       player.x+player.w > p.x &&
-      player.y < p.y+p.h &&
-      player.y+player.h > p.y &&
+      player.y+player.h <= p.y + player.vy &&
+      player.y+player.h >= p.y &&
       player.vy >= 0
     ){
       player.y = p.y-player.h;
@@ -106,56 +105,27 @@ function update(){
     }
   });
 
-  /* RANDOM PLATFORM appears after jump */
+  /* Random platform trigger */
   if(player.x > 400) randomPlatform.active = true;
 
-  if(randomPlatform.active){
-    let p = randomPlatform;
-    if(
-      player.x < p.x+p.w &&
-      player.x+player.w > p.x &&
-      player.y < p.y+p.h &&
-      player.y+player.h > p.y &&
-      player.vy >= 0
-    ){
-      player.y = p.y-player.h;
-      player.vy = 0;
-      player.onGround = true;
-    }
-  }
-
-  /* moving laser */
+  /* Moving laser */
   laser.x += laser.dir * 2;
   if(laser.x < 260 || laser.x > 420) laser.dir *= -1;
 
-  if(
-    player.x < laser.x+laser.w &&
-    player.x+player.w > laser.x &&
-    player.y < laser.y+laser.h &&
-    player.y+player.h > laser.y
-  ){
-    die();
-  }
+  if(rectHit(player, laser)) die();
 
-  /* star collision */
+  /* Star collision */
   stars.forEach(s=>{
     let dx = player.x+12 - s.x;
     let dy = player.y+15 - s.y;
     if(Math.sqrt(dx*dx+dy*dy) < s.r+10) die();
   });
 
-  /* fall death */
+  /* Fall death */
   if(player.y > canvas.height) die();
 
-  /* portal */
-  if(
-    player.x < portal.x+portal.w &&
-    player.x+player.w > portal.x &&
-    player.y < portal.y+portal.h &&
-    player.y+player.h > portal.y
-  ){
-    win = true;
-  }
+  /* Portal */
+  if(rectHit(player, portal)) win = true;
 
   document.getElementById("time").textContent =
     ((Date.now()-startTime)/1000).toFixed(1);
@@ -164,13 +134,40 @@ function update(){
 function die(){
   deaths++;
   document.getElementById("deaths").textContent = deaths;
+
+  randomPlatform.active = false; // FIXED BUG
+
   resetPlayer();
+}
+
+function rectHit(a,b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+/* ---------- DRAW STAR SHAPE ---------- */
+function drawStar(x,y,r){
+  ctx.beginPath();
+  for(let i=0;i<5;i++){
+    ctx.lineTo(
+      x + r*Math.cos((18+i*72)*Math.PI/180),
+      y - r*Math.sin((18+i*72)*Math.PI/180)
+    );
+    ctx.lineTo(
+      x + (r/2)*Math.cos((54+i*72)*Math.PI/180),
+      y - (r/2)*Math.sin((54+i*72)*Math.PI/180)
+    );
+  }
+  ctx.closePath();
+  ctx.fillStyle="orange";
+  ctx.shadowColor="red";
+  ctx.shadowBlur=15;
+  ctx.fill();
+  ctx.shadowBlur=0;
 }
 
 /* ---------- DRAW PLAYER ---------- */
 function drawPlayer(){
-  let x = player.x, y = player.y;
-
+  let x=player.x, y=player.y;
   ctx.fillStyle="#ffd166"; ctx.fillRect(x+6,y,12,12);
   ctx.fillStyle="#06d6a0"; ctx.fillRect(x+4,y+12,16,12);
   ctx.fillStyle="#118ab2"; ctx.fillRect(x+4,y+24,6,6);
@@ -186,32 +183,28 @@ function draw(){
   let grad = ctx.createLinearGradient(0,canvas.height-80,0,canvas.height);
   grad.addColorStop(0,"#220044");
   grad.addColorStop(1,"black");
-  ctx.fillStyle = grad;
+  ctx.fillStyle=grad;
   ctx.fillRect(0,canvas.height-80,canvas.width,80);
 
   /* platforms */
   ctx.fillStyle="#00d4ff";
   platforms.forEach(p=>{
-    if(p.fake && player.x > p.x && player.x < p.x+p.w) return;
+    if(p.fake && player.x>p.x && player.x<p.x+p.w) return;
     ctx.fillRect(p.x,p.y,p.w,p.h);
   });
 
+  /* random hidden platform */
   if(randomPlatform.active){
-    let p=randomPlatform;
-    ctx.fillRect(p.x,p.y,p.w,p.h);
+    ctx.fillStyle="rgba(180,0,255,0.3)";
+    ctx.fillRect(randomPlatform.x,randomPlatform.y,randomPlatform.w,randomPlatform.h);
   }
 
   /* laser */
   ctx.fillStyle="red";
   ctx.fillRect(laser.x,laser.y,laser.w,laser.h);
 
-  /* stars */
-  ctx.fillStyle="yellow";
-  stars.forEach(s=>{
-    ctx.beginPath();
-    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-    ctx.fill();
-  });
+  /* deadly stars */
+  stars.forEach(s=>drawStar(s.x,s.y,s.r));
 
   /* portal */
   ctx.fillStyle="purple";
@@ -233,6 +226,7 @@ function loop(){
 }
 loop();
 </script>
+
 
 
 
