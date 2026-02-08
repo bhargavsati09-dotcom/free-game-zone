@@ -4,53 +4,44 @@
   <title>Free Game Zone</title>
   <style>
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #4facfe, #00f2fe);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+      background: #0b1220;
       color: white;
+      font-family: Arial;
       text-align: center;
-    }
-
-    .container {
-      background: rgba(0,0,0,0.3);
       padding: 40px;
-      border-radius: 20px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
     }
 
     h1 {
-      font-size: 48px;
-      margin-bottom: 20px;
+      color: #00ff88;
     }
 
-    button {
-      padding: 15px 30px;
+    .game-btn {
+      display: block;
+      margin: 20px auto;
+      padding: 15px 25px;
+      background: #00ff88;
+      color: black;
       font-size: 18px;
-      border: none;
       border-radius: 10px;
-      background: #ffcc00;
-      cursor: pointer;
-      transition: 0.3s;
+      text-decoration: none;
+      width: 200px;
+      font-weight: bold;
     }
 
-    button:hover {
-      background: #ffaa00;
-      transform: scale(1.05);
+    .game-btn:hover {
+      background: #00cc66;
     }
   </style>
 </head>
+
 <body>
 
-<div class="container">
   <h1>🎮 Free Game Zone</h1>
-  <p>Play fun browser games for free!</p>
- <button onclick="location.href='play.html'">Play Platform Game</button>
+  <p>Select a game to play:</p>
 
-</div>
+  <a class="game-btn" href="troll-game.html">Play Troll Game</a>
+  <a class="game-btn" href="play.html">Play Trolley Game</a>
 
 </body>
 </html>
+
