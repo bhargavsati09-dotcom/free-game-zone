@@ -212,11 +212,12 @@ function drawFace(){
 /* ---------- DRAW ---------- */
 function draw(){
 
-  ctx.clearRect(0,0,canvas.width,canv
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
   /* platforms */
   ctx.fillStyle="#00d4ff";
   platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
-as.height);
+
 
   if(fakePlatform.active){
     ctx.fillStyle="orange";
