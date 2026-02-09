@@ -47,21 +47,46 @@ let keys = {};
 addEventListener("keydown", e=>keys[e.key]=true);
 addEventListener("keyup", e=>keys[e.key]=false);
 
-/* PLATFORMS */
-let platforms = [
-  {x:80,  y:canvas.height-160, w:160, h:16},
-  {x:320, y:canvas.height-240, w:140, h:16},
-  {x:560, y:canvas.height-320, w:140, h:16},
-];
+/* ---------- WORLD STATE ---------- */
 
-/* SECRET APPEAR PLATFORM */
+let basePlatform = {x:80, y:canvas.height-160, w:160, h:16, active:true};
+
 let secretPlatform = {
-  x:760,
-  y:canvas.height-400,
+  x:420,
+  y:canvas.height-260,
   w:140,
   h:16,
   visible:false
 };
+
+/* killing star */
+let star = {
+  x:460,
+  y:canvas.height-300,
+  r:14
+};
+
+function resetWorld(){
+  basePlatform.active = true;
+  secretPlatform.visible = false;
+}     
+/* draw killing star */
+ctx.fillStyle = "yellow";
+ctx.beginPath();
+for(let i=0;i<5;i++){
+  let angle = i * (Math.PI * 2) / 5 - Math.PI/2;
+  let x = star.x + Math.cos(angle) * star.r;
+  let y = star.y + Math.sin(angle) * star.r;
+  ctx.lineTo(x,y);
+
+  angle += Math.PI/5;
+  x = star.x + Math.cos(angle) * (star.r/2);
+  y = star.y + Math.sin(angle) * (star.r/2);
+  ctx.lineTo(x,y);
+}
+ctx.closePath();
+ctx.fill();
+
 
 /* MOVING LASER (SAFE HEIGHT) */
 let laser = {
@@ -72,11 +97,6 @@ let laser = {
   dir:1
 };
 
-/* KILLING STARS */
-let stars = [
-  {x:400, y:canvas.height-260, r:12},
-  {x:650, y:canvas.height-340, r:12}
-];
 
 /* PORTAL */
 let portal = {x:980, y:canvas.height-470, w:60, h:90};
@@ -101,11 +121,53 @@ function die(){
   deaths++;
   laughTimer = 50;
   firstDeath = true;
+
+  resetWorld();   // VERY IMPORTANT
   resetPlayer();
 }
 
 /* UPDATE */
 function update(){
+
+  player.vx = 0;
+  if(keys["ArrowLeft"]) player.vx = -5;
+  if(keys["ArrowRight"]) player.vx = 5;
+  if(keys["ArrowUp"] && onGround()) player.vy = jumpPower;
+
+  player.vy += gravity;
+  player.y += player.vy;
+
+  /* stand on base platform */
+  if(basePlatform.active && hit(player, basePlatform) && player.vy >= 0){
+    player.y = basePlatform.y - player.h;
+    player.vy = 0;
+  }
+
+  /* MAGIC TRIGGER */
+  if(basePlatform.active && player.x > basePlatform.x + 80){
+    basePlatform.active = false;
+    secretPlatform.visible = true;
+  }
+
+  /* stand on secret platform */
+  if(secretPlatform.visible && hit(player, secretPlatform) && player.vy >= 0){
+    player.y = secretPlatform.y - player.h;
+    player.vy = 0;
+  }
+
+  /* STAR KILL */
+  let dx = (player.x + player.w/2) - star.x;
+  let dy = (player.y + player.h/2) - star.y;
+  if(Math.sqrt(dx*dx + dy*dy) < star.r + 10){
+    die();
+  }
+
+  /* fall */
+  if(player.y > canvas.height) die();
+
+  if(laughTimer>0) laughTimer--;
+}
+
 
   /* movement */
   player.vx = 0;
@@ -231,10 +293,22 @@ function draw(){
   ctx.fillRect(portal.x, portal.y, portal.w, portal.h);
 
   /* player */
-  ctx.fillStyle="#06d6a0";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
+  /* robe body */
+ctx.fillStyle = "#5f0f40";
+ctx.fillRect(player.x, player.y+8, player.w, player.h-8);
 
-  drawFace();
+/* glowing head */
+ctx.fillStyle = "#ffd166";
+ctx.beginPath();
+ctx.arc(player.x + player.w/2, player.y+6, 6, 0, Math.PI*2);
+ctx.fill();
+
+/* eye visor */
+ctx.strokeStyle = "cyan";
+ctx.beginPath();
+ctx.moveTo(player.x+6, player.y+6);
+ctx.lineTo(player.x+player.w-6, player.y+6);
+ctx.stroke();
 
   /* UI */
   ctx.fillStyle="white";
