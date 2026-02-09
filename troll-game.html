@@ -158,16 +158,7 @@ function update(){
 }
 
 /* ---------- DRAW FACE (EXTREME) ---------- */
-function drawFace(ctx.fillStyle="white";
-ctx.font="18px Arial";
-
-if(!firstDeath){
-  ctx.fillText("Just a simple space person game", x-150, y+80);
-}
-else if(firstDeath && deaths === 1){
-  ctx.fillText("Nah, it is not that much simple but you can do it", x-210, y+80);
-}
-){
+function drawFace(){
 
   let x = canvas.width - 200;
   let y = 140;
@@ -205,24 +196,27 @@ else if(firstDeath && deaths === 1){
   }
   ctx.stroke();
 
+  /* YOUR ORIGINAL TEXT (exact words kept) */
   ctx.fillStyle="white";
   ctx.font="18px Arial";
 
   if(!firstDeath){
-    ctx.fillText("Just a simple space person game", x-140, y+70);
-  }else if(firstDeath && deaths===1){
-    ctx.fillText("Nah… not that simple 😈", x-90, y+70);
+    ctx.fillText("Just a simple space person game", x-150, y+80);
+  }
+  else if(firstDeath && deaths === 1){
+    ctx.fillText("Nah, it is not that much simple but you can do it", x-210, y+80);
   }
 }
+
 
 /* ---------- DRAW ---------- */
 function draw(){
 
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
+  ctx.clearRect(0,0,canvas.width,canv
   /* platforms */
   ctx.fillStyle="#00d4ff";
   platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
+as.height);
 
   if(fakePlatform.active){
     ctx.fillStyle="orange";
